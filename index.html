@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en" class="dark h-full bg-[#0a0c10] text-[#eaeaf2]">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>clipper.exe - AI Short-Form Video Clipper Studio</title>
+  
+  <!-- Tailwind Config (must load before Tailwind script) -->
+  <script>
+    tailwind = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              DEFAULT: '#8b5cf6',
+              glow: '#a78bfa',
+              dark: '#6d28d9',
+              surface: '#0a0c10',
+              card: '#12151e',
+              border: '#1e2330',
+              elevated: '#171a21',
+              muted: '#9aa0ad'
+            },
+            tier: {
+              viral: '#22c55e',
+              good: '#3b82f6',
+              fair: '#f59e0b',
+              poor: '#64748b'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Fira Code', 'monospace']
+          },
+          animation: {
+            'pulse-glow': 'pulseGlow 2s infinite ease-in-out',
+            'shimmer': 'shimmer 2s infinite linear'
+          },
+          keyframes: {
+            pulseGlow: {
+              '0%, 100%': { opacity: '0.4', filter: 'drop-shadow(0 0 8px rgba(139, 92, 246, 0.4))' },
+              '50%': { opacity: '0.9', filter: 'drop-shadow(0 0 16px rgba(139, 92, 246, 0.8))' }
+            },
+            shimmer: {
+              '0%': { backgroundPosition: '-200% 0' },
+              '100%': { backgroundPosition: '200% 0' }
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <script src="libs/tailwindcss.js"></script>
+
+  <!-- Google Fonts: Inter & JetBrains Mono (local fallback) -->
+  <style>
+    @font-face {
+      font-family: 'Inter';
+      src: local('Inter');
+    }
+    @font-face {
+      font-family: 'JetBrains Mono';
+      src: local('JetBrains Mono');
+    }
+  </style>
+
+  <!-- React & React DOM (local) -->
+  <script src="libs/react.development.js"></script>
+  <script src="libs/react-dom.development.js"></script>
+  
+  <!-- Babel for JSX (local) -->
+  <script src="libs/babel.min.js"></script>
+
+  <!-- Lucide Icons (local) -->
+  <script src="libs/lucide.js"></script>
+
+  <style>
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0a0c10;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e2330;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #2d3340;
+    }
+    
+    /* Glassmorphism utility */
+    .glass-panel {
+      background: rgba(18, 21, 30, 0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    /* Subtitle animation simulation */
+    @keyframes wordBounce {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.18) translateY(-2px); }
+    }
+    .animate-bounce-word {
+      display: inline-block;
+      animation: wordBounce 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    /* Allow text selection in inputs */
+    input, textarea, select { user-select: text !important; }
+  </style>
+</head>
+<body class="h-full overflow-hidden antialiased font-sans">
+  <div id="root" class="h-full"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo } = React;
+
+    // --- MOCK DATA FOR DEMO ---
+    const INITIAL_CLIPS = [
+      {
+        id: "clip-1",
+        title: "The #1 Mistake Beginner Founders Make in 2026",
+        duration: "00:38",
+        score: 94,
+        tier: "viral",
+        platform: "tiktok",
+        timestamp: "02:14 - 02:52",
+        viewsEst: "1.2M - 2.8M",
+        thumbnail: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80",
+        audioEnergy: 92,
+        hookStrength: 98,
+        topicRetention: 91,
+        cutFrequency: 88,
+        rationale: "High energy explosive opener with word-level hook retention. Clear question-answer format ideal for TikTok algorithmic boost.",
+        subtitles: [
+          { id: 1, start: 0.2, end: 1.8, text: "If you're building software in 2026...", highlight: "building" },
+          { id: 2, start: 1.8, end: 3.5, text: "STOP focusing on code architecture first!", highlight: "STOP" },
+          { id: 3, start: 3.5, end: 5.8, text: "Focus 90% of your energy on distribution.", highlight: "distribution" },
+          { id: 4, start: 5.8, end: 8.2, text: "Here is the exact formula we used to hit 10k users.", highlight: "formula" }
+        ],
+        aiTitles: [
+          "Stop coding your app until you watch this! 🚀",
+          "Why 90% of SaaS startups fail in 2026 😱",
+          "The brutal truth about software development..."
+        ]
+      },
+      {
+        id: "clip-2",
+        title: "Why AI Agents Are Replacing Standard Web Apps",
+        duration: "00:45",
+        score: 87,
+        tier: "viral",
+        platform: "shorts",
+        timestamp: "08:10 - 08:55",
+        viewsEst: "800K - 1.5M",
+        thumbnail: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80",
+        audioEnergy: 85,
+        hookStrength: 90,
+        topicRetention: 89,
+        cutFrequency: 84,
+        rationale: "Strong viral trend topic. High curiosity trigger in first 3 seconds.",
+        subtitles: [
+          { id: 1, start: 0.1, end: 2.0, text: "Web apps are officially dying.", highlight: "dying" },
+          { id: 2, start: 2.0, end: 4.2, text: "Here is why AI Agents are taking over...", highlight: "AI Agents" }
+        ],
+        aiTitles: [
+          "Websites are DEAD. Use this instead 🔥",
+          "How AI agents changed tech forever 🤖"
+        ]
+      },
+      {
+        id: "clip-3",
+        title: "How We Scaled Tauri & Rust to 1M Downloads",
+        duration: "00:52",
+        score: 78,
+        tier: "good",
+        platform: "reels",
+        timestamp: "14:22 - 15:14",
+        viewsEst: "250K - 500K",
+        thumbnail: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=400&q=80",
+        audioEnergy: 76,
+        hookStrength: 80,
+        topicRetention: 79,
+        cutFrequency: 75,
+        rationale: "Great technical value density. Sustained engagement across tech dev community.",
+        subtitles: [
+          { id: 1, start: 0.1, end: 2.5, text: "Electron was burning 2GB of RAM.", highlight: "RAM" },
+          { id: 2, start: 2.5, end: 4.8, text: "So we rewrote the entire desktop tool in Rust.", highlight: "Rust" }
+        ],
+        aiTitles: [
+          "Why we dumped Electron for Rust ⚡",
+          "How to build desktop apps in 2026"
+        ]
+      },
+      {
+        id: "clip-4",
+        title: "Unfiltered Thoughts on Desktop UX vs Web UX",
+        duration: "00:29",
+        score: 62,
+        tier: "fair",
+        platform: "tiktok",
+        timestamp: "21:05 - 21:34",
+        viewsEst: "50K - 120K",
+        thumbnail: "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80",
+        audioEnergy: 65,
+        hookStrength: 60,
+        topicRetention: 68,
+        cutFrequency: 58,
+        rationale: "Conversational tone, slight drop in middle audio energy level.",
+        subtitles: [
+          { id: 1, start: 0.1, end: 2.0, text: "Web apps feel flimsy compared to native UI.", highlight: "flimsy" }
+        ],
+        aiTitles: [
+          "Desktop apps are making a huge comeback!"
+        ]
+      }
+    ];
+
+    const TYPOGRAPHY_PRESETS = [
+      { id: "hormozi", name: "Alex Hormozi", font: "Inter", weight: "800", color: "#facc15", stroke: "4px #000", bg: "none" },
+      { id: "mrbeast", name: "MrBeast Explosive", font: "Inter", weight: "900", color: "#ffffff", stroke: "5px #000", bg: "#ef4444" },
+      { id: "minimal", name: "Minimal Clean", font: "Inter", weight: "600", color: "#ffffff", stroke: "none", bg: "rgba(0,0,0,0.6)" },
+      { id: "cyber", name: "Cyber Neon", font: "JetBrains Mono", weight: "700", color: "#38bdf8", stroke: "2px #0f172a", bg: "rgba(15,23,42,0.8)" }
+    ];
+
+    function ClipperApp() {
+      const [clips, setClips] = useState(INITIAL_CLIPS);
+      const [selectedClip, setSelectedClip] = useState(INITIAL_CLIPS[0]);
+      const [isPlaying, setIsPlaying] = useState(false);
+      const [currentTime, setCurrentTime] = useState(2.4);
+      const [activeTab, setActiveTab] = useState("subtitles");
+      const [selectedPreset, setSelectedPreset] = useState(TYPOGRAPHY_PRESETS[0]);
+      const [aspectRatio, setAspectRatio] = useState("9:16");
+      const [showSafeZones, setShowSafeZones] = useState(true);
+      const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+      const [isSidecarOpen, setIsSidecarOpen] = useState(false);
+      const [ingestUrl, setIngestUrl] = useState("https://youtube.com/watch?v=tech_podcast_2026");
+      const [targetClipCount, setTargetClipCount] = useState(25);
+      const [isIngesting, setIsIngesting] = useState(false);
+      const [filterTier, setFilterTier] = useState("all");
+      const [activeSubtitles, setActiveSubtitles] = useState(INITIAL_CLIPS[0].subtitles);
+      const [projectName, setProjectName] = useState("Podcast_Ep104_Master_1080p.mp4");
+      const [startTrim, setStartTrim] = useState("00:02:14.200");
+      const [endTrim, setEndTrim] = useState("00:02:52.800");
+
+      useEffect(() => {
+        let timer;
+        if (isPlaying) {
+          timer = setInterval(() => {
+            setCurrentTime((prev) => (prev >= 10 ? 0 : prev + 0.1));
+          }, 100);
+        }
+        return () => clearInterval(timer);
+      }, [isPlaying]);
+
+      const handleSelectClip = (clip) => {
+        setSelectedClip(clip);
+        setActiveSubtitles(clip.subtitles);
+        setCurrentTime(0);
+        setIsPlaying(false);
+      };
+
+      const handleStartIngest = async () => {
+        if (!ingestUrl.trim()) return;
+        setIsIngesting(true);
+        try {
+          const res = await fetch("http://127.0.0.1:8000/clips", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              url: ingestUrl,
+              target_count: targetClipCount,
+              min_len: 15,
+              max_len: 60,
+              aspect: "9:16",
+              resolution: "1080x1920"
+            })
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || "Failed to create job");
+          }
+          const data = await res.json();
+          const jobId = data.job_id;
+
+          const pollInterval = setInterval(async () => {
+            try {
+              const statusRes = await fetch("http://127.0.0.1:8000/clips/" + jobId);
+              const job = await statusRes.json();
+              if (job.status === "done") {
+                clearInterval(pollInterval);
+                setIsIngesting(false);
+                const clipsRes = await fetch("http://127.0.0.1:8000/clips/" + jobId + "/clips");
+                const clipsData = await clipsRes.json();
+                if (clipsData.clips && clipsData.clips.length > 0) {
+                  const uiClips = clipsData.clips.map((c) => ({
+                    id: "clip-" + c.index,
+                    title: "Clip " + c.index,
+                    duration: String(Math.floor(c.duration / 60)).padStart(2, "0") + ":" + String(Math.floor(c.duration % 60)).padStart(2, "0"),
+                    score: c.score,
+                    tier: c.tier,
+                    platform: c.recommended_platform || "tiktok",
+                    timestamp: String(Math.floor(c.start / 60)).padStart(2, "0") + ":" + String(Math.floor(c.start % 60)).padStart(2, "0") + " - " + String(Math.floor(c.end / 60)).padStart(2, "0") + ":" + String(Math.floor(c.end % 60)).padStart(2, "0"),
+                    viewsEst: "--",
+                    thumbnail: "",
+                    audioEnergy: 75,
+                    hookStrength: 70,
+                    topicRetention: 75,
+                    cutFrequency: 60,
+                    rationale: c.rationale || "",
+                    subtitles: [],
+                    aiTitles: [],
+                    output_path: c.output_path
+                  }));
+                  setClips(uiClips);
+                  setSelectedClip(uiClips[0]);
+                  setActiveSubtitles(uiClips[0].subtitles);
+                }
+              } else if (job.status === "failed") {
+                clearInterval(pollInterval);
+                setIsIngesting(false);
+                alert("Processing failed: " + (job.error || "Unknown error"));
+              }
+            } catch (pollErr) {
+              console.error("Poll error:", pollErr);
+            }
+          }, 2000);
+        } catch (err) {
+          setIsIngesting(false);
+          console.error("Ingest error:", err);
+          alert("Failed to process URL: " + err.message);
+        }
+      };
+      const getTierBadge = (tier, score) => {
+        const styles = {
+          viral: { bg: "bg-emerald-500/10", text: "text-emerald-400", border: "border-emerald-500/30", icon: "flame" },
+          good: { bg: "bg-blue-500/10", text: "text-blue-400", border: "border-blue-500/30", icon: "zap" },
+          fair: { bg: "bg-amber-500/10", text: "text-amber-400", border: "border-amber-500/30", icon: "scale" },
+          poor: { bg: "bg-slate-500/10", text: "text-slate-400", border: "border-slate-500/30", icon: null }
+        };
+        const s = styles[tier] || styles.poor;
+        return (
+          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${s.bg} ${s.text} border ${s.border}`}>
+            {s.icon && <i data-lucide={s.icon} className={`w-3 h-3 ${s.text}`}></i>}
+            {tier.toUpperCase()} ({score})
+          </span>
+        );
+      };
+
+      const filteredClips = useMemo(() => {
+        if (filterTier === "all") return clips;
+        return clips.filter(c => c.tier === filterTier);
+      }, [clips, filterTier]);
+
+      useEffect(() => {
+        if (window.lucide) window.lucide.createIcons();
+      });
+
+      return (
+        <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#0a0c10] text-[#eaeaf2]">
+          {/* HEADER */}
+          <header className="h-[52px] bg-[#12151e] border-b border-[#1e2330] flex items-center justify-between px-4 z-30 select-none">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center font-black text-white shadow-lg shadow-purple-500/30 text-sm">C</div>
+                <span className="font-bold tracking-tight text-sm text-white">clipper<span className="text-purple-400">.exe</span></span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-300 font-mono border border-purple-500/20">v2.4 Tauri</span>
+              </div>
+              <div className="h-4 w-[1px] bg-[#2d3340] mx-1"></div>
+              <button onClick={() => setIsSidecarOpen(!isSidecarOpen)} className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-[#0a0c10] border border-[#1e2330] hover:border-purple-500/40 transition-colors text-xs">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="font-mono text-[11px] text-slate-300">Python 8000</span>
+                <i data-lucide="terminal" className="w-3 h-3 text-slate-400"></i>
+              </button>
+            </div>
+            <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-[#0a0c10] border border-[#1e2330] rounded-lg">
+              <i data-lucide="video" className="w-3.5 h-3.5 text-purple-400"></i>
+              <input type="text" value={projectName} onChange={(e) => setProjectName(e.target.value)} className="bg-transparent text-xs font-medium text-slate-200 truncate max-w-[200px] focus:outline-none focus:text-white" />
+              <span className="text-[10px] text-slate-500 font-mono">48:12</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setActiveTab("ai")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-medium transition-all">
+                <i data-lucide="sparkles" className="w-3.5 h-3.5 text-purple-400"></i>
+                <span>AI Title Magic</span>
+              </button>
+              <button onClick={() => setIsExportModalOpen(true)} className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-xs shadow-lg shadow-purple-600/30 transition-all hover:scale-[1.02] active:scale-[0.98]">
+                <i data-lucide="download" className="w-3.5 h-3.5"></i>
+                <span>Export Clip</span>
+              </button>
+              <div className="h-4 w-[1px] bg-[#2d3340] mx-1"></div>
+              <div className="flex items-center gap-1 text-slate-500">
+                <button className="p-1 hover:text-slate-200"><i data-lucide="minus" className="w-3.5 h-3.5"></i></button>
+                <button className="p-1 hover:text-slate-200"><i data-lucide="square" className="w-3 h-3"></i></button>
+                <button className="p-1 hover:text-red-400"><i data-lucide="x" className="w-3.5 h-3.5"></i></button>
+              </div>
+            </div>
+          </header>
+
+          {/* MAIN 3-PANEL WORKSPACE */}
+          <div className="flex-1 flex overflow-hidden relative">
+            {/* LEFT SIDEBAR */}
+            <aside className="w-[330px] min-w-[330px] bg-[#12151e] border-r border-[#1e2330] flex flex-col h-full z-20">
+              <div className="p-3.5 border-b border-[#1e2330] bg-[#0a0c10]/40 space-y-3">
+                <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
+                  <span className="flex items-center gap-1.5">
+                    <i data-lucide="link" className="w-3.5 h-3.5 text-purple-400"></i>
+                    Video Ingestion
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-mono">yt-dlp + PyScene</span>
+                </div>
+                <div className="space-y-2">
+                  <input type="text" value={ingestUrl} onChange={(e) => setIngestUrl(e.target.value)} placeholder="Paste YouTube or Livestream URL..." className="w-full bg-[#0a0c10] border border-[#1e2330] rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-purple-500/60 font-mono placeholder:text-slate-600" />
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[11px] text-slate-400">
+                      <span>Clip Limit Target</span>
+                      <span className="font-mono text-purple-400 font-semibold">{targetClipCount} clips</span>
+                    </div>
+                    <input type="range" min="5" max="100" value={targetClipCount} onChange={(e) => setTargetClipCount(parseInt(e.target.value))} className="w-full accent-purple-500 h-1 bg-[#1e2330] rounded-lg appearance-none cursor-pointer" />
+                  </div>
+                  <button onClick={handleStartIngest} disabled={isIngesting} className="w-full py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-medium text-xs flex items-center justify-center gap-2 shadow-md shadow-purple-600/20 transition-all disabled:opacity-50">
+                    {isIngesting ? (<><i data-lucide="loader-2" className="w-3.5 h-3.5 animate-spin"></i><span>Parsing Scenes & Whisper VTT...</span></>) : (<><i data-lucide="scissors" className="w-3.5 h-3.5"></i><span>Process & Generate Clips</span></>)}
+                  </button>
+                </div>
+              </div>
+              <div className="px-3 py-2 border-b border-[#1e2330] flex items-center justify-between bg-[#12151e]">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Clips Bin</span>
+                  <span className="px-1.5 py-0.2 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-mono font-bold">{clips.length}</span>
+                </div>
+                <div className="flex items-center gap-1 bg-[#0a0c10] p-0.5 rounded-md border border-[#1e2330]">
+                  {['all', 'viral', 'good'].map(tier => (
+                    <button key={tier} onClick={() => setFilterTier(tier)} className={`px-2 py-0.5 rounded text-[10px] font-medium capitalize transition-all ${filterTier === tier ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}>{tier}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2.5 space-y-2.5">
+                {filteredClips.map((clip) => {
+                  const isSelected = selectedClip.id === clip.id;
+                  return (
+                    <div key={clip.id} onClick={() => handleSelectClip(clip)} className={`group relative rounded-xl border p-2.5 transition-all cursor-pointer ${isSelected ? 'bg-[#171a21] border-purple-500/80 shadow-lg shadow-purple-500/10 ring-1 ring-purple-500/40' : 'bg-[#0a0c10]/60 border-[#1e2330] hover:border-[#2d3340] hover:bg-[#12151e]'}`}>
+                      <div className="flex gap-2.5">
+                        <div className="relative w-16 h-24 rounded-lg overflow-hidden bg-slate-900 border border-[#1e2330] flex-shrink-0">
+                          <img src={clip.thumbnail} alt="thumb" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+                          <span className="absolute bottom-1 right-1 px-1 bg-black/80 text-[9px] font-mono text-white rounded">{clip.duration}</span>
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/40 transition-opacity">
+                            <i data-lucide="play" className="w-5 h-5 text-white fill-white"></i>
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between gap-1">
+                              {getTierBadge(clip.tier, clip.score)}
+                              <span className="text-[10px] text-slate-500 font-mono">{clip.timestamp}</span>
+                            </div>
+                            <h4 className="text-xs font-semibold text-slate-200 line-clamp-2 leading-tight group-hover:text-purple-300 transition-colors">{clip.title}</h4>
+                          </div>
+                          <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-[#1e2330]/60">
+                            <span className="flex items-center gap-1 font-mono">
+                              <i data-lucide="trending-up" className="w-3 h-3 text-emerald-400"></i>
+                              {clip.viewsEst}
+                            </span>
+                            <span className="uppercase text-[9px] font-bold text-slate-500">{clip.platform}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </aside>
+
+            {/* CENTER WORKSPACE */}
+            <main className="flex-1 flex flex-col h-full bg-[#0a0c10] overflow-hidden">
+              <div className="h-10 border-b border-[#1e2330] bg-[#12151e]/80 flex items-center justify-between px-4 z-10">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1 bg-[#0a0c10] p-0.5 rounded-lg border border-[#1e2330]">
+                    {['9:16', '16:9', '1:1'].map(ratio => (
+                      <button key={ratio} onClick={() => setAspectRatio(ratio)} className={`px-2 py-0.5 rounded text-[10px] font-mono font-medium transition-colors ${aspectRatio === ratio ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}>{ratio}</button>
+                    ))}
+                  </div>
+                  <button onClick={() => setShowSafeZones(!showSafeZones)} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[11px] transition-colors ${showSafeZones ? 'bg-purple-500/10 border-purple-500/40 text-purple-300' : 'bg-[#0a0c10] border-[#1e2330] text-slate-400'}`}>
+                    <i data-lucide="layout-grid" className="w-3 h-3"></i>
+                    <span>Safe Overlay</span>
+                  </button>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-slate-400 font-mono">
+                  <span className="flex items-center gap-1"><i data-lucide="monitor" className="w-3 h-3 text-purple-400"></i> 1080x1920</span>
+                  <span>•</span>
+                  <span>60 FPS</span>
+                </div>
+              </div>
+              <div className="flex-1 flex items-center justify-center p-4 relative overflow-hidden bg-radial from-[#171a21] to-[#0a0c10]">
+                <div className={`relative bg-black rounded-2xl overflow-hidden shadow-2xl border border-[#2d3340] flex items-center justify-center transition-all duration-300 ${aspectRatio === '9:16' ? 'h-[92%] aspect-[9/16]' : aspectRatio === '16:9' ? 'w-[85%] aspect-[16/9]' : 'h-[85%] aspect-square'}`}>
+                  <img src={selectedClip.thumbnail} alt="Video frame" className="w-full h-full object-cover filter brightness-95" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none"></div>
+                  <div className="absolute bottom-20 left-4 right-4 text-center pointer-events-none z-10 px-2">
+                    <div className="inline-block transition-all duration-150" style={{ fontFamily: selectedPreset.font, fontWeight: selectedPreset.weight, color: selectedPreset.color, textShadow: selectedPreset.stroke !== 'none' ? '0px 2px 8px rgba(0,0,0,0.9)' : 'none', background: selectedPreset.bg, padding: selectedPreset.bg !== 'none' ? '6px 14px' : '0', borderRadius: '8px' }}>
+                      <p className="text-xl md:text-2xl tracking-tight leading-tight uppercase font-extrabold">
+                        {activeSubtitles[0]?.text.split(" ").map((word, idx) => {
+                          const isHigh = word.toLowerCase().includes(activeSubtitles[0]?.highlight?.toLowerCase());
+                          return (<span key={idx} className={`inline-block mx-1 ${isHigh ? 'text-amber-300 scale-110 underline decoration-purple-500' : ''}`}>{word}</span>);
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                  {showSafeZones && (
+                    <div className="absolute inset-0 border border-dashed border-red-500/30 pointer-events-none flex flex-col justify-between p-4">
+                      <div className="flex justify-between items-start text-[10px] text-red-400/60 font-mono">
+                        <span>TOP SAFE MARGIN (120px)</span>
+                        <span>LIVE PREVIEW</span>
+                      </div>
+                      <div className="absolute right-3 bottom-16 space-y-4 text-white/50 flex flex-col items-center">
+                        <div className="w-7 h-7 rounded-full bg-white/20 backdrop-blur flex items-center justify-center"><i data-lucide="heart" className="w-4 h-4"></i></div>
+                        <div className="w-7 h-7 rounded-full bg-white/20 backdrop-blur flex items-center justify-center"><i data-lucide="message-circle" className="w-4 h-4"></i></div>
+                        <div className="w-7 h-7 rounded-full bg-white/20 backdrop-blur flex items-center justify-center"><i data-lucide="share-2" className="w-4 h-4"></i></div>
+                      </div>
+                      <div className="text-[10px] text-red-400/60 font-mono text-center">CAPTION SAFE AREA (220px BOTTOM)</div>
+                    </div>
+                  )}
+                  <button onClick={() => setIsPlaying(!isPlaying)} className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/10 transition-colors group cursor-pointer z-10" aria-label={isPlaying ? "Pause video" : "Play video"}>
+                    <div className="w-14 h-14 rounded-full bg-purple-600/80 hover:bg-purple-600 text-white flex items-center justify-center backdrop-blur-md shadow-xl transition-transform group-hover:scale-110">
+                      <i data-lucide={isPlaying ? "pause" : "play"} className="w-6 h-6 fill-white ml-0.5"></i>
+                    </div>
+                  </button>
+                </div>
+              </div>
+              <div className="h-12 border-t border-[#1e2330] bg-[#12151e] px-4 flex items-center justify-between select-none">
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setIsPlaying(!isPlaying)} className="p-2 rounded-lg bg-purple-600 text-white hover:bg-purple-500 transition-colors" title={isPlaying ? "Pause (Space)" : "Play (Space)"}>
+                    <i data-lucide={isPlaying ? "pause" : "play"} className="w-4 h-4"></i>
+                  </button>
+                  <button onClick={() => { setCurrentTime(0); setIsPlaying(false); }} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#1e2330]" title="Reset to Start">
+                    <i data-lucide="rotate-ccw" className="w-4 h-4"></i>
+                  </button>
+                  <div className="flex items-center gap-2 w-36">
+                    <input type="range" min="0" max="10" step="0.1" value={currentTime} onChange={(e) => setCurrentTime(parseFloat(e.target.value))} className="w-full accent-purple-500 h-1 bg-[#1e2330] rounded-lg appearance-none cursor-pointer" />
+                  </div>
+                  <div className="font-mono text-xs text-slate-200 bg-[#0a0c10] px-2.5 py-1 rounded border border-[#1e2330]">
+                    <span className="text-purple-400 font-bold">00:00:0{currentTime.toFixed(1)}</span>
+                    <span className="text-slate-600"> / </span>
+                    <span className="text-slate-400">00:00:38.0</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 bg-[#0a0c10] p-1 rounded-lg border border-[#1e2330]">
+                  <button className="p-1.5 rounded text-slate-400 hover:text-purple-300 hover:bg-[#1e2330]" title="Split Track [B]"><i data-lucide="scissors" className="w-3.5 h-3.5"></i></button>
+                  <button className="p-1.5 rounded text-slate-400 hover:text-purple-300 hover:bg-[#1e2330]" title="Set In Point [I]"><i data-lucide="bracket-left" className="w-3.5 h-3.5"></i></button>
+                  <button className="p-1.5 rounded text-slate-400 hover:text-purple-300 hover:bg-[#1e2330]" title="Set Out Point [O]"><i data-lucide="bracket-right" className="w-3.5 h-3.5"></i></button>
+                  <button className="p-1.5 rounded text-purple-400 bg-purple-500/10" title="Snapping Active"><i data-lucide="magnet" className="w-3.5 h-3.5"></i></button>
+                </div>
+              </div>
+              <div className="h-[180px] min-h-[180px] bg-[#0a0c10] border-t border-[#1e2330] flex flex-col relative select-none">
+                <div className="h-6 bg-[#12151e] border-b border-[#1e2330] flex items-center px-12 relative font-mono text-[9px] text-slate-500 justify-between">
+                  {['00:00', '00:05', '00:10', '00:15', '00:20', '00:25', '00:30', '00:35', '00:40'].map((sec, i) => (
+                    <div key={i} className="flex flex-col items-center">
+                      <span>{sec}</span>
+                      <div className="h-1.5 w-[1px] bg-[#2d3340] mt-0.5"></div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex-1 overflow-y-auto relative p-2 space-y-1.5">
+                  <div className="absolute top-0 bottom-0 w-[2px] bg-purple-500 z-30 pointer-events-none shadow-[0_0_10px_rgba(139,92,246,0.8)]" style={{ left: `${(currentTime / 10) * 90 + 5}%` }}>
+                    <div className="w-3 h-3 bg-purple-500 rotate-45 -ml-[5px] -mt-1 rounded-sm shadow"></div>
+                  </div>
+                  <div className="h-10 bg-[#12151e] rounded-lg border border-[#1e2330] flex items-center overflow-hidden relative">
+                    <div className="w-20 bg-[#171a21] h-full border-r border-[#1e2330] flex items-center px-2 text-[10px] font-semibold text-slate-400 gap-1 z-10">
+                      <i data-lucide="film" className="w-3 h-3 text-purple-400"></i>
+                      <span>Video</span>
+                    </div>
+                    <div className="flex-1 flex h-full p-0.5 gap-1">
+                      <div className="w-[35%] bg-purple-900/40 border border-purple-500/50 rounded flex items-center px-2 justify-between group cursor-pointer hover:bg-purple-900/60 transition-colors">
+                        <span className="text-[10px] font-mono text-purple-200 truncate">Scene_01 (Hook)</span>
+                        <i data-lucide="grip-vertical" className="w-3 h-3 text-purple-400 opacity-50"></i>
+                      </div>
+                      <div className="w-[45%] bg-indigo-900/40 border border-indigo-500/50 rounded flex items-center px-2 justify-between group cursor-pointer hover:bg-indigo-900/60 transition-colors">
+                        <span className="text-[10px] font-mono text-indigo-200 truncate">Scene_02 (Body)</span>
+                        <i data-lucide="grip-vertical" className="w-3 h-3 text-indigo-400 opacity-50"></i>
+                      </div>
+                      <div className="w-[18%] bg-purple-900/40 border border-purple-500/50 rounded flex items-center px-2 justify-between group cursor-pointer hover:bg-purple-900/60 transition-colors">
+                        <span className="text-[10px] font-mono text-purple-200 truncate">CTA</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="h-10 bg-[#12151e] rounded-lg border border-[#1e2330] flex items-center overflow-hidden relative">
+                    <div className="w-20 bg-[#171a21] h-full border-r border-[#1e2330] flex items-center px-2 text-[10px] font-semibold text-slate-400 gap-1 z-10">
+                      <i data-lucide="type" className="w-3 h-3 text-amber-400"></i>
+                      <span>Subtitles</span>
+                    </div>
+                    <div className="flex-1 flex h-full p-0.5 gap-1.5">
+                      {activeSubtitles.map((sub, idx) => (
+                        <div key={sub.id} className="flex-1 bg-amber-500/10 border border-amber-500/40 rounded flex items-center px-2 text-[10px] text-amber-300 font-mono truncate hover:border-amber-400 cursor-pointer">
+                          "{sub.text}"
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="h-8 bg-[#12151e] rounded-lg border border-[#1e2330] flex items-center overflow-hidden relative">
+                    <div className="w-20 bg-[#171a21] h-full border-r border-[#1e2330] flex items-center px-2 text-[10px] font-semibold text-slate-400 gap-1 z-10">
+                      <i data-lucide="mic" className="w-3 h-3 text-emerald-400"></i>
+                      <span>Audio</span>
+                    </div>
+                    <div className="flex-1 h-full flex items-center px-2 gap-0.5 opacity-60">
+                      {Array.from({ length: 90 }).map((_, i) => (
+                        <div key={i} className="flex-1 bg-emerald-500 rounded-full" style={{ height: `${Math.sin(i * 0.4) * 40 + 50}%` }}></div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </main>
+
+            {/* RIGHT SIDEBAR */}
+            <aside className="w-[340px] min-w-[340px] bg-[#12151e] border-l border-[#1e2330] flex flex-col h-full z-20">
+              <div className="flex border-b border-[#1e2330] bg-[#0a0c10]/40 p-1">
+                <button onClick={() => setActiveTab("properties")} className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${activeTab === "properties" ? 'bg-[#12151e] text-purple-400 border border-[#1e2330] shadow' : 'text-slate-400 hover:text-slate-200'}`}>
+                  <i data-lucide="sliders" className="w-3.5 h-3.5"></i>
+                  <span>Metrics</span>
+                </button>
+                <button onClick={() => setActiveTab("subtitles")} className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${activeTab === "subtitles" ? 'bg-[#12151e] text-purple-400 border border-[#1e2330] shadow' : 'text-slate-400 hover:text-slate-200'}`}>
+                  <i data-lucide="type" className="w-3.5 h-3.5"></i>
+                  <span>Subtitles</span>
+                </button>
+                <button onClick={() => setActiveTab("ai")} className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${activeTab === "ai" ? 'bg-[#12151e] text-purple-400 border border-[#1e2330] shadow' : 'text-slate-400 hover:text-slate-200'}`}>
+                  <i data-lucide="sparkles" className="w-3.5 h-3.5 text-purple-400"></i>
+                  <span>AI Titles</span>
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3.5 space-y-4">
+                {activeTab === "properties" && (
+                  <div className="space-y-4">
+                    <div className="p-3 rounded-xl bg-[#0a0c10] border border-[#1e2330] space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-300">Virality Predictor</span>
+                        {getTierBadge(selectedClip.tier, selectedClip.score)}
+                      </div>
+                      <div className="space-y-2 pt-1">
+                        <div>
+                          <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+                            <span>Audio Energy & Dynamics</span>
+                            <span className="font-mono text-purple-400">{selectedClip.audioEnergy}%</span>
+                          </div>
+                          <div className="h-1.5 w-full bg-[#1e2330] rounded-full overflow-hidden">
+                            <div className="h-full bg-purple-500 rounded-full" style={{ width: `${selectedClip.audioEnergy}%` }}></div>
+                          </div>
+                        </div>
+                        <div>
+                          <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+                            <span>First 3s Hook Retention</span>
+                            <span className="font-mono text-emerald-400">{selectedClip.hookStrength}%</span>
+                          </div>
+                          <div className="h-1.5 w-full bg-[#1e2330] rounded-full overflow-hidden">
+                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${selectedClip.hookStrength}%` }}></div>
+                          </div>
+                        </div>
+                        <div>
+                          <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+                            <span>Topic & Keyword Density</span>
+                            <span className="font-mono text-blue-400">{selectedClip.topicRetention}%</span>
+                          </div>
+                          <div className="h-1.5 w-full bg-[#1e2330] rounded-full overflow-hidden">
+                            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${selectedClip.topicRetention}%` }}></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-xl bg-purple-500/5 border border-purple-500/20 space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-300">
+                        <i data-lucide="brain-circuit" className="w-3.5 h-3.5 text-purple-400"></i>
+                        <span>AI Rationale</span>
+                      </div>
+                      <p className="text-xs text-slate-300 leading-relaxed">{selectedClip.rationale}</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-[#0a0c10] border border-[#1e2330] space-y-2.5">
+                      <span className="text-xs font-bold text-slate-300">Exact Time Trimming</span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] text-slate-500 font-mono">START IN</label>
+                          <input type="text" value={startTrim} onChange={(e) => setStartTrim(e.target.value)} className="w-full bg-[#12151e] border border-[#1e2330] rounded p-1.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-purple-500" />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-slate-500 font-mono">END OUT</label>
+                          <input type="text" value={endTrim} onChange={(e) => setEndTrim(e.target.value)} className="w-full bg-[#12151e] border border-[#1e2330] rounded p-1.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-purple-500" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {activeTab === "subtitles" && (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <span className="text-xs font-bold text-slate-300">Typography Presets</span>
+                      <div className="grid grid-cols-2 gap-2">
+                        {TYPOGRAPHY_PRESETS.map((preset) => (
+                          <button key={preset.id} onClick={() => setSelectedPreset(preset)} className={`p-2.5 rounded-xl border text-left transition-all ${selectedPreset.id === preset.id ? 'bg-purple-500/10 border-purple-500 text-purple-200 ring-1 ring-purple-500/50' : 'bg-[#0a0c10] border-[#1e2330] text-slate-400 hover:border-slate-700'}`}>
+                            <span className="text-xs font-bold block">{preset.name}</span>
+                            <span className="text-[10px] font-mono text-slate-500 block mt-0.5">{preset.font}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-300">Word Animation</label>
+                      <select className="w-full bg-[#0a0c10] border border-[#1e2330] rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
+                        <option>⚡ Karaoke Highlight Bounce</option>
+                        <option>💥 Word Pop-In Explosion</option>
+                        <option>🌊 Smooth Wave Fade</option>
+                        <option>🔒 Static Minimal</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2 pt-2 border-t border-[#1e2330]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-300">Whisper Subtitles</span>
+                        <span className="text-[10px] font-mono text-purple-400">Click word to highlight</span>
+                      </div>
+                      <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                        {activeSubtitles.map((sub, index) => (
+                          <div key={sub.id} className="p-2 rounded-lg bg-[#0a0c10] border border-[#1e2330] space-y-1">
+                            <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+                              <span>Line #{index + 1}</span>
+                              <span>{sub.start}s - {sub.end}s</span>
+                            </div>
+                            <input type="text" value={sub.text} onChange={(e) => { const newSubs = [...activeSubtitles]; newSubs[index].text = e.target.value; setActiveSubtitles(newSubs); }} className="w-full bg-[#12151e] border border-[#1e2330] rounded px-2 py-1 text-xs text-slate-200 focus:border-purple-500" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {activeTab === "ai" && (
+                  <div className="space-y-4">
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-purple-900/30 to-indigo-900/20 border border-purple-500/30 space-y-2">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-purple-300">
+                        <i data-lucide="sparkles" className="w-4 h-4 text-purple-400"></i>
+                        <span>AI Virality Optimizer</span>
+                      </div>
+                      <p className="text-xs text-slate-400 leading-normal">
+                        Generates platform-tailored hooks and titles designed for TikTok & Short algorithms.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <span className="text-xs font-bold text-slate-300">Recommended Hook Titles</span>
+                      {selectedClip.aiTitles.map((title, i) => (
+                        <div key={i} className="p-2.5 rounded-xl bg-[#0a0c10] border border-[#1e2330] hover:border-purple-500/50 transition-colors space-y-2">
+                          <p className="text-xs font-medium text-slate-200">"{title}"</p>
+                          <div className="flex justify-between items-center text-[10px]">
+                            <span className="text-emerald-400 font-mono">High CTR Hook</span>
+                            <button className="px-2 py-0.5 rounded bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 font-semibold">Copy</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="space-y-1.5 pt-2 border-t border-[#1e2330]">
+                      <span className="text-xs font-bold text-slate-300">Trending Hashtags</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {['#tech', '#startups', '#coding2026', '#viral', '#aiagents', '#saas'].map((tag) => (
+                          <span key={tag} className="px-2 py-1 rounded-md bg-[#0a0c10] border border-[#1e2330] text-[11px] font-mono text-purple-400">{tag}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </aside>
+          </div>
+
+          {/* EXPORT MODAL */}
+          {isExportModalOpen && (
+            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+              <div className="w-full max-w-md bg-[#12151e] border border-[#2d3340] rounded-2xl shadow-2xl p-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-[#1e2330] pb-3">
+                  <div className="flex items-center gap-2">
+                    <i data-lucide="download" className="w-4 h-4 text-purple-400"></i>
+                    <h3 className="text-sm font-bold text-white">Export Clip via FFmpeg Sidecar</h3>
+                  </div>
+                  <button onClick={() => setIsExportModalOpen(false)} className="text-slate-400 hover:text-white">
+                    <i data-lucide="x" className="w-4 h-4"></i>
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-300">Output Preset</label>
+                    <select className="w-full bg-[#0a0c10] border border-[#1e2330] rounded-lg p-2 text-xs text-slate-200">
+                      <option>TikTok / Shorts 1080x1920 (60fps, libx264 CRF 20)</option>
+                      <option>Instagram Reels Ultra HD (1080x1920 High Bitrate)</option>
+                      <option>ProRes Master Archive (Lossless 4:2:2)</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-[#0a0c10] border border-[#1e2330]">
+                    <span className="text-xs text-slate-300">FFmpeg Audio Loudnorm (-14 LUFS)</span>
+                    <input type="checkbox" defaultChecked className="accent-purple-500 h-4 w-4" />
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-[#0a0c10] border border-[#1e2330]">
+                    <span className="text-xs text-slate-300">Burn Subtitles into Video Track</span>
+                    <input type="checkbox" defaultChecked className="accent-purple-500 h-4 w-4" />
+                  </div>
+                </div>
+                <div className="pt-2 flex gap-2">
+                  <button onClick={() => setIsExportModalOpen(false)} className="flex-1 py-2 rounded-lg bg-[#1e2330] hover:bg-[#2d3340] text-slate-300 text-xs font-medium">Cancel</button>
+                  <button onClick={() => { alert("FFmpeg Sidecar render started! File saved to %APPDATA%/ClipStudio/renders/"); setIsExportModalOpen(false); }} className="flex-1 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-lg shadow-purple-600/30">Render Clip Now</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SIDECAR DRAWER */}
+          {isSidecarOpen && (
+            <div className="fixed bottom-0 left-0 right-0 h-48 bg-[#0a0c10] border-t border-purple-500/40 z-40 p-3 font-mono text-xs flex flex-col space-y-2">
+              <div className="flex items-center justify-between text-slate-400 pb-1 border-b border-[#1e2330]">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span className="text-slate-200 font-bold">FastAPI + Celery Sidecar Process Log (localhost:8000)</span>
+                </div>
+                <button onClick={() => setIsSidecarOpen(false)} className="hover:text-white">
+                  <i data-lucide="x" className="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto space-y-1 text-slate-400 text-[11px]">
+                <p className="text-emerald-400">[INFO] FastAPI sidecar server listening on http://127.0.0.1:8000</p>
+                <p className="text-blue-400">[CELERY] Task celery.task_id_881a2 initialized with pool=solo</p>
+                <p>[SCENEDETECT] Detected 14 candidate scene cuts in input stream.</p>
+                <p>[WHISPER] faster-whisper (base.en) transcribing audio channel (8kHz mono)...</p>
+                <p className="text-purple-400">[VIRALITY] Heuristic evaluator computed score=94 for segment [02:14 - 02:52].</p>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<ClipperApp />);
+  </script>
+</body>
+</html>
